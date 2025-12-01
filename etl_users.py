@@ -82,8 +82,14 @@ def inserir_usuarios_no_sqlite(dados_completos, nome_banco="dados_usuarios.db"):
                 UF TEXT,
                 pais TEXT,
                 universidade TEXT,
-                empresa TEXT, 
-                cargo TEXT
+                empresa TEXT,
+                setor TEXT, 
+                cargo TEXT,
+                estado_empresa TEXT,
+                cartao TEXT,
+                moeda TEXT,
+                criptomoeda TEXT,
+                rede TEXT 
             )
         """)
         print("Tabela 'usuarios' criada com sucesso.")
@@ -105,15 +111,21 @@ def inserir_usuarios_no_sqlite(dados_completos, nome_banco="dados_usuarios.db"):
                 usuario.get('address', {}).get('stateCode'),
                 usuario.get('address', {}).get('country'),
                 usuario.get('university'),
+                usuario.get('company', {}).get('name'),
                 usuario.get('company', {}).get('department'),
-                usuario.get('company', {}).get('title')
+                usuario.get('company', {}).get('title'),
+                usuario.get('company', {}).get('address', {}).get('state'),
+                usuario.get('bank', {}).get('cardType'),
+                usuario.get('bank', {}).get('currency'),
+                usuario.get('crypto', {}).get('coin'),
+                usuario.get('crypto', {}).get('network')
             )
             
             # Comando SQL para inserção (usando ? para evitar injeção de SQL)
             cursor.execute("""
                 INSERT INTO usuarios 
-                (id, primeiro_nome, sobrenome, idade, email, username, cidade, estado, UF, pais, universidade, empresa, cargo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, primeiro_nome, sobrenome, idade, email, username, cidade, estado, UF, pais, universidade, empresa, setor, cargo, estado_empresa, cartao, moeda, criptomoeda, rede)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, user_data)
             contador += 1
             
