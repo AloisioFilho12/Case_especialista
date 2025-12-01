@@ -146,3 +146,64 @@ default_args = {
     'retries': 3,  # Configura o retry de 3 tentativas em caso de falha
     'retry_delay': timedelta(minutes=5),
 }
+
+with DAG(
+    'dag_regua_cobranca', # Nome da DAG
+    default_args=default_args,
+    description='DAG para atualização da Régua de Cobrança',
+    schedule_interval='*/5 * * * *',  # Execução a cada 5 minutos
+    start_date=days_ago(1),
+    catchup=False,
+    tags=['cobranca', 'etl'],
+) as dag:
+
+    inicio = DummyOperator(task_id='start')
+    
+    # 1. Verifica a chegada do arquivo (caminho retornado via XCom)
+    verificar_arquivo_task = PythonOperator(
+        task_id='verificar_arquivo_task',
+        python_callable=verificar_arquivo_fn,
+        op_kwargs={'diretorio': DIRETORIO_BASE, 'arquivo': ARQUIVO_NOME},
+    )
+
+    # 2. Processa os dados (Puxa o caminho do XCom da task anterior, retorna o DF para o XCom)
+    processar_arquivo_task = PythonOperator(
+        task_id='processar_arquivo_task',
+        python_callable=processar_arquivo_fn,
+        # O XCom da task anterior preenche o argumento 'caminho_arquivo'
+    )
+
+    # 3. Condicional para dia útil/fim de semana
+    condicional_dia_semana = BranchPythonOperator(
+        task_id='condicional_dia_semana',
+        python_callable=escolher_caminho,
+    )
+
+    # 4a. Carga no BD (Puxa o DF do XCom)
+    enviar_para_bd_task = PythonOperator(
+        task_id='enviar_para_bd_task',
+        python_callable=carregar_para_banco_fn,
+        op_kwargs={'nome_tabela': NOME_TABELA, 'nome_banco': NOME_BANCO_DADOS},
+    )
+
+    # 4b. Arquivamento dos dados (Puxa o DF do XCom)
+    arquivar_dados_task = PythonOperator(
+        task_id='arquivar_dados_task',
+        python_callable=arquivar_dados_fn,
+        op_kwargs={'diretorio_base': DIRETORIO_BASE, 'arquivo_nome': ARQUIVO_NOME},
+    )
+
+    fim = DummyOperator(
+        task_id='end',
+        trigger_rule='none_failed_min_one_success', # Finaliza se um dos caminhos (BD ou Arquivamento) for bem-sucedido
+    )
+
+    # Define o fluxo de tarefas
+    chain(
+        inicio,
+        verificar_arquivo_task,
+        processar_arquivo_task,
+        condicional_dia_semana,
+        [enviar_para_bd_task, arquivar_dados_task],
+        fim
+    )
